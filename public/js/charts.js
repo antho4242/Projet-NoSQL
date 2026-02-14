@@ -316,5 +316,5 @@ function refreshData() {
 }
 
 document.getElementById('refresh-data-btn').addEventListener('click', refreshData);
-setInterval(refreshData, 5000);
+//setInterval(refreshData, 5000);
 });
