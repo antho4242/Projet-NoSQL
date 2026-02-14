@@ -1,9 +1,14 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
 
-// Récupére toutes les planètes  
+// Recupere toutes les planetes Non detruites
 $planetsCollection = Database::getCollection('planets');
-$planets = $planetsCollection->find()->toArray();
+$planets = $planetsCollection->find([
+    '$or' => [
+        ['destroyed' => ['$exists' => false]],
+        ['destroyed' => false]
+    ]
+])->toArray();
 
 // Récupére toutes les missions 
 $missionsCollection = Database::getCollection('missions');

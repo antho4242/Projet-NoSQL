@@ -4,63 +4,74 @@ require_once __DIR__ . '/../../config/database.php';
 
 $data = json_decode(file_get_contents('php://input'), true);
 
-if (!$data) {
-    echo json_encode(['error' => 'Données invalides']);
+// Validation de l'ID (obligatoire pour update)
+if (!$data || !isset($data['_id'])) {
+    echo json_encode(['error' => 'ID manquant']);
     exit;
+}
+
+// Validation du nom si present
+if (isset($data['name']) && trim($data['name']) === '') {
+    echo json_encode(['error' => 'Le nom ne peut pas etre vide']);
+    exit;
+}
+
+// Validation et conversion des champs numeriques
+$numericFields = [
+    'diameter_km' => 'int',
+    'mass_kg' => 'float',
+    'distance_from_sun_km' => 'int',
+    'orbital_period_days' => 'float',
+    'rotation_period_hours' => 'float',
+    'moons_count' => 'int'
+];
+
+foreach ($numericFields as $field => $type) {
+    if (isset($data[$field])) {
+        // Verifier que c'est bien un nombre
+        if (!is_numeric($data[$field])) {
+            echo json_encode(['error' => "Le champ $field doit etre un nombre"]);
+            exit;
+        }
+        
+        // Verifier que c'est positif (sauf rotation_period qui peut etre negatif)
+        if ($field !== 'rotation_period_hours' && $data[$field] < 0) {
+            echo json_encode(['error' => "Le champ $field doit etre positif"]);
+            exit;
+        }
+        
+        // Convertir au bon type
+        if ($type === 'int') {
+            $data[$field] = (int)$data[$field];
+        } else {
+            $data[$field] = (float)$data[$field];
+        }
+    }
+}
+
+// Validation du booleen has_rings
+if (isset($data['has_rings'])) {
+    $data['has_rings'] = filter_var($data['has_rings'], FILTER_VALIDATE_BOOLEAN);
 }
 
 try {
     $planetsCollection = Database::getCollection('planets');
     
-  
-    if (isset($data['planetId'])) {
-        $planetId = new MongoDB\BSON\ObjectId($data['planetId']);
-        unset($data['planetId']);
-        
-        // Convertie les valeurs numériques
-        if (isset($data['mass_kg'])) {
-            $data['mass_kg'] = floatval($data['mass_kg']);
-        }
-        if (isset($data['rotation_period_hours'])) {
-            $data['rotation_period_hours'] = floatval($data['rotation_period_hours']);
-        }
-        
-        $result = $planetsCollection->updateOne(
-            ['_id' => $planetId],
-            ['$set' => $data]
-        );
-        
-        $updatedPlanet = $planetsCollection->findOne(['_id' => $planetId]);
-        
-        echo json_encode([
-            'success' => true,
-            'modified' => $result->getModifiedCount(),
-            'planet' => $updatedPlanet
-        ]);
+    // Extraire l'ID et le supprimer des donnees a mettre a jour
+    $id = $data['_id'];
+    unset($data['_id']);
+    
+    // Mettre a jour
+    $result = $planetsCollection->updateOne(
+        ['_id' => new MongoDB\BSON\ObjectId($id)],
+        ['$set' => $data]
+    );
+    
+    if ($result->getModifiedCount() > 0 || $result->getMatchedCount() > 0) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['error' => 'Planete non trouvee']);
     }
-     
-    else {
-        $planetName = $data['name'] ?? null;
-        $updates = $data['updates'] ?? [];
-        
-        if (!$planetName) {
-            echo json_encode(['error' => 'Nom de planète manquant']);
-            exit;
-        }
-          
-        $result = $planetsCollection->updateOne(
-            ['name' => $planetName],
-            ['$set' => $updates]
-        );
-        
-        $updatedPlanet = $planetsCollection->findOne(['name' => $planetName]);
-        
-        echo json_encode([
-            'success' => true,
-            'modified' => $result->getModifiedCount(),
-            'planet' => $updatedPlanet
-        ]);
-    } 
     
 } catch (Exception $e) {
     echo json_encode(['error' => $e->getMessage()]);

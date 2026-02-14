@@ -65,8 +65,8 @@ document.getElementById('planetForm').addEventListener('submit', async (e) => {
         const endpoint = isEdit ? '/api/update-planet.php' : '/api/add-planet.php';
         
         if (isEdit) {
-            planetData.planetId = formData.get('planetId');
-        }
+        planetData._id = formData.get('planetId');
+                }
         
         const response = await fetch(endpoint, {
             method: 'POST',
